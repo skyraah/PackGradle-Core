@@ -23,20 +23,21 @@ pg-core（Java Core）重建的架构决策集：所有阻塞实现的决策各�
 - [pg-core 领域模型与能力域重审（概念地图 + 分组）](https://github.com/skyraah/PackGradle/issues/115)（2026-09-10）：十核心概念全保留；时代词三删（legacy 识别/切换/退场，Java 对旧关联不识别当普通内容）；补五词条（扫描/扫描快照/差异/计划/同步范围，受管范围→同步范围更名）；契约面四词归 #119/#123；七域能力分组定稿（关系与端点 7/差异与决议 10/执行与恢复 8/历史与对象库 7/下载与凭据 4/监听 2/诊断 2）；概念地图落本仓库 `docs/concept-map.md`（票 #118 建仓时自母仓 pg-core/ 迁入）。
 - [pg-core 进程模型与生命周期（daemon/单实例/锁归属）](https://github.com/skyraah/PackGradle/issues/116)（2026-09-10）：无共享按需进程——每客户端 spawn 自己的 Core 子进程（CLI 每命令一个、完即退；GUI 客户端打开期间各持一个），不设 daemon、无跨客户端共享、无服务发现；单实例收窄到同类型 GUI 客户端（配置管理须读时加载+原子写）；存储协调沿用 Go（WAL + busy_timeout + active-task 数据库检查，不加跨进程文件锁，数据库是唯一跨进程协调点）；断连即终止、在途任务靠下次启动恢复，无宽限窗口。决议全文见票内评论与本仓库 `docs/adr/0016-pg-core-process-model.md`。
 - [pg-core Java 技术基线与仓库物理形态](https://github.com/skyraah/PackGradle/issues/118)（2026-09-10）：JDK 25（Temurin）+ jpackage 自带运行时分发；平台线程默认、虚拟线程仅大量并发 IO 点状使用；Gradle + Kotlin DSL；普通 package 分层（七域切包）不上 JPMS；库=JDK HttpClient / Jackson 3.1 / xerial sqlite-jdbc + PRAGMA user_version 自写迁移器 / picocli / SLF4J+logback-classic；单一产物两种模式（`packgradle` 默认 CLI、`packgradle core` 子进程）；独立仓库 PackGradle-Core（本仓库）承接 pg-core 全套与 TS 客户端生成链，旧 ADR 0001–0015 留母仓，协议变更两仓协作。决议全文见票内评论与本仓库 `docs/adr/0017-pg-core-tech-baseline.md`（含 Gson/Jackson 并存备注，归 #119 计成本）。
+- [pg-core Protocol 与事件流选型](https://github.com/skyraah/PackGradle/issues/119)（2026-09-10）：JSON-RPC 2.0 over stdio（LSP 式 Content-Length 长度帧；自写薄层七件不引 lsp4j，Gson 并存备注作废）；**单 Core 多工作区前提**、Workspace 一等协议实体（显式 `workspace_id` 路由 + `workspace/open`/`close`/`list` 生命周期，重复调用幂等，close 遇运行中 task 返 `err.workspace.busy`）；`initialize` 严格相等握手（`protocol_version` 整数首版 1、`capabilities`=方法+事件清单；查询面 DTO 的 `schema_version` 全砍）；长操作一律立即返 `task_id` + `task_updated` 事件通知；单一 live 通知流（信封 `{schema_version, stream_epoch, stream_sequence, event_id, event_type, workspace_id, emitted_at, relation_id, task_id, payload}`，epoch 变化即重查，无重放无订阅状态，**#121 序号持久化约束清零**）；`err.<域>.<原因>` 字符串码延续（JSON-RPC 统一应用 code、真身在 `error.data`）；TS 类型只从 Protocol Contract/DTO 层生成（Domain→Application→Protocol Contract 分层）。决议全文见票内评论与本仓库 `docs/adr/0018-pg-core-protocol.md`。
 
-## 票面快照（2026-09-10 · 票 #118 收口时；#115/#116/#117/#126 同日先已收口）
+## 票面快照（2026-09-10 · 票 #119 收口时；#115/#116/#117/#118/#126 同日先已收口）
 
 | 票 | 标题 | 状态 |
 |---|---|---|
 | #115 | 领域模型与能力域重审 | **已关** |
 | #116 | 进程模型与生命周期 | **已关** |
 | #117 | [research] Java 生态事实矩阵 | **已关** |
-| #118 | Java 技术基线与仓库物理形态 | **已关**（本票） |
-| #119 | Protocol 与事件流选型 | 边界可取（#118 已解阻塞） |
+| #118 | Java 技术基线与仓库物理形态 | **已关** |
+| #119 | Protocol 与事件流选型 | **已关**（本票，ADR-0018） |
 | #120 | 领域语义重审·能力域组 | 边界可取（按七域分组拆票） |
 | #121 | 存储与持久化边界 | 边界可取 |
-| #122 | 任务编排与 watcher 架构 | 被阻塞（2：#119/#120） |
-| #123 | 三客户端接入契约 | 被阻塞（1：#119） |
+| #122 | 任务编排与 watcher 架构 | 被阻塞（1：#120；#119 已解） |
+| #123 | 三客户端接入契约 | 边界可取（#119 已解阻塞） |
 | #124 | 迁移与行为对齐策略 | 被阻塞（1：#121） |
 | #125 | Desktop host 选型（低优先） | 被阻塞（1：#123） |
 | #126 | [research] Java 系统保险柜生态 | **已关** |
@@ -49,7 +50,7 @@ pg-core（Java Core）重建的架构决策集：所有阻塞实现的决策各�
 - 打包分发余项（安装包格式、AOT cache 启用与否、版本更新通道——打包方式已定 jpackage 自带运行时，见 #118/ADR-0017）
 - i18n/本地化归属（Core vs 客户端）
 - 性能基线（大包扫描、CAS 冷链路——承接已关 #69 的线索）
-- 多客户端并发打开同一工作区（进程级口径已定于 #116：允许并存、数据库是唯一协调点；更细行为语义待 #119/#122 毕业）
+- 多客户端并发打开同一工作区（进程级口径已定于 #116：允许并存、数据库是唯一协调点；协议侧已定于 #119：事件只覆盖本 Core 实例、无订阅状态、恢复一律重查；跨客户端写入的可见性与刷新触发待 #122/#121）
 - 测试与 CI 形态（含 TS 客户端链）
 
 ## Out of scope
