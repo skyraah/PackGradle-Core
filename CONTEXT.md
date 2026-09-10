@@ -18,7 +18,7 @@ _Avoid_: 项目（指端点时）、pack
 _Avoid_: 实例、Prism 联动
 
 **修订号（Revision）**:
-一条 Relation 的策略代次；创建时即第 1 代，仅随 MappingPolicy 修改递增，不在 UI 展示（内部一致性字段）。见 ADR-0002。
+一条 Relation 的策略代次；创建时即第 1 代，仅随 MappingPolicy 修改递增，不在 UI 展示（内部一致性字段）；作为多客户端进程经 SQLite 共享数据库写入时的并发校验。见 ADR-0002、ADR-0019。
 _Avoid_: 版本（指关系时）、策略集版本
 
 **策略集版本（Policy Set Version）**:
@@ -38,8 +38,12 @@ _Avoid_: 功能（指单动作时）
 _Avoid_: 权限、是否可点
 
 **重绑（Rebind）**:
-把关系一端的根路径替换为新端点（Prepare 预检 + Apply 执行）；P1 下 Apply 后不继承基线、重走初始化，等价证明留 Phase 2。见 `docs/contract/03-p1-contract.md` §2.4。
+把关系一端的根路径替换为新端点（Prepare 预检 + Apply 执行）；Apply 后不继承基线、恒重走初始化；修订号不递增，旧计划因绑定指纹失配失效。见 ADR-0003、ADR-0019。
 _Avoid_: 重新绑定（指 UI 文案时）
+
+**删除工作区（Delete Workspace）**:
+删除一条 Relation 的终态操作：前置为无活跃任务且不在恢复所需；删除关系及其计划/任务/预检等关系级依附状态；仍被其他关系引用的端点保留，失去全部引用的端点同事务清理；历史提交与 CAS 对象的处置归历史域。无软删除、不可恢复。见 ADR-0019。
+_Avoid_: 解绑（指重绑语境）、归档
 
 **扫描（Scan）**:
 读取工作区双端管辖目录的当前文件状态——文件树、packwiz metafile 解析与内容摘要——产出两端各自的扫描快照；是差异计算的输入。
