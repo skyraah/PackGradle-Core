@@ -27,8 +27,9 @@ pg-core（Java Core）重建的架构决策集：所有阻塞实现的决策各�
 - [pg-core Protocol 与事件流选型](https://github.com/skyraah/PackGradle/issues/119)（2026-09-10）：JSON-RPC 2.0 over stdio（LSP 式 Content-Length 长度帧；自写薄层七件不引 lsp4j，Gson 并存备注作废）；**单 Core 多工作区前提**、Workspace 一等协议实体（显式 `workspace_id` 路由 + `workspace/open`/`close`/`list` 生命周期，重复调用幂等，close 遇运行中 task 返 `err.workspace.busy`）；`initialize` 严格相等握手（`protocol_version` 整数首版 1、`capabilities`=方法+事件清单；查询面 DTO 的 `schema_version` 全砍）；长操作一律立即返 `task_id` + `task_updated` 事件通知；单一 live 通知流（信封 `{schema_version, stream_epoch, stream_sequence, event_id, event_type, workspace_id, emitted_at, relation_id, task_id, payload}`，epoch 变化即重查，无重放无订阅状态，**#121 序号持久化约束清零**）；`err.<域>.<原因>` 字符串码延续（JSON-RPC 统一应用 code、真身在 `error.data`）；TS 类型只从 Protocol Contract/DTO 层生成（Domain→Application→Protocol Contract 分层）。决议全文见票内评论与本仓库 `docs/adr/0018-pg-core-protocol.md`。
 - [pg-core 领域语义重审·伞票拆档](https://github.com/skyraah/PackGradle/issues/120)（2026-09-10）：七域拆五张域票——[#128 关系与端点](https://github.com/skyraah/PackGradle/issues/128)/[#129 差异与决议](https://github.com/skyraah/PackGradle/issues/129)/[#130 执行与恢复](https://github.com/skyraah/PackGradle/issues/130)/[#131 历史与对象库](https://github.com/skyraah/PackGradle/issues/131)/[#132 下载](https://github.com/skyraah/PackGradle/issues/132)；监听并入 #122、凭据归 #127、诊断留 fog（待 #123 成形）；域票裁 what/when/why、#121/#122 裁 how/where/who（暂存不裁磁盘布局、历史与对象库概念分开）；边只接真实语义前置（#128→#129/#130/#131、#131→#132 与 #121、#130→#122、#127 解除）；Demo-out=实现排期排除、语义照常定义。全文见票内 resolution。
 - [pg-core 领域语义重审·关系与端点域](https://github.com/skyraah/PackGradle/issues/128)（2026-09-11）：七决议——修订号乐观锁全套维持，防护对象重述为「多客户端进程经 SQLite 共享数据库的并发写入校验」；Workspace↔Relation 1:1 投影维持（协议 workspace_id 即关系标识）；端点跨关系共享合法，baseline/plan/revision/history 按 Relation 隔离（#129 继承口径）；预检两段式 + 单事务 doctrine 全套维持，CLI 单命令=串联两段、无旁路；重绑定稿（恒重走初始化、无 baseline inheritance、删「等价证明」旧待办）；删除=Relation 生命周期一等操作（终态、无 soft-delete、前置无活跃任务且非恢复所需，History/Commit/CAS 处置移交 #131）；端点清理归删除语义（不变量：任意存活端点至少被一条存活关系引用）。决议全文见票内 resolution 与本仓库 `docs/adr/0019-pg-core-relation-endpoint-domain.md`。
+- [pg-core 领域语义重审·差异与决议域](https://github.com/skyraah/PackGradle/issues/129)（2026-09-11）：十决议——域语义全套维持（分类 11 种/决议 8 种与矩阵/计划失效三机制+TTL 15 分钟/确认四码/同步范围编译约束与 ignore 生效点七处/低置信度 mod 身份纪律/.index「不观察即不计划」/上游变更纯叙事/快照最新一份+四指纹/事件发射点）；**新增快照策略失配门**（同步与回滚计划生成统一校验 policy_digest，`err.sync.snapshot_stale`；stale 快照可读可列、动作面拒绝；自动重扫归 #122、UI 标记归 #123）；扫描成本模型维持（全枚举+hash cache 五元组键，FileKey 文件身份语义要求维持、实现通道留执行）；计划不清理维持；mod 持久排除维持不做（ADR-0013 遗留落点）；RuntimeLocalPolicy 删除（Q8-a 遗留落点）；死建模不带（identity_ambiguous/mapping_collision/shared_materialization/LogicalResource/PlanConfirmed）；ADR-0009 合并全套维持定稿（事实修正：Go 已全量实现），Java 合并库选型入 fog。决议全文见票内 resolution 与本仓库 `docs/adr/0020-pg-core-diff-resolution-domain.md`。
 
-## 票面快照（2026-09-11 · 票 #128 收口时；#115–#120/#126 已先收口）
+## 票面快照（2026-09-11 · 票 #129 收口时；#115–#120/#126/#128 已先收口）
 
 | 票 | 标题 | 状态 |
 |---|---|---|
@@ -38,10 +39,10 @@ pg-core（Java Core）重建的架构决策集：所有阻塞实现的决策各�
 | #118 | Java 技术基线与仓库物理形态 | **已关** |
 | #119 | Protocol 与事件流选型 | **已关**（ADR-0018） |
 | #120 | 领域语义重审·能力域组（伞票） | **已关**（拆五域票） |
-| #128 | 领域语义重审·关系与端点域 | **已关**（本票，ADR-0019） |
-| #129 | 领域语义重审·差异与决议域 | 边界可取（阻塞解除，开工顺序第一位） |
-| #130 | 领域语义重审·执行与恢复域 | 边界可取（阻塞解除；下游 #122） |
-| #131 | 领域语义重审·历史与对象库域 | 边界可取（阻塞解除；承接 #128 移交的删除处置；下游 #121/#132） |
+| #128 | 领域语义重审·关系与端点域 | **已关**（ADR-0019） |
+| #129 | 领域语义重审·差异与决议域 | **已关**（本票，ADR-0020） |
+| #130 | 领域语义重审·执行与恢复域 | 边界可取（开工顺序第一位；下游 #122） |
+| #131 | 领域语义重审·历史与对象库域 | 边界可取（承接 #128 移交的删除处置；下游 #121/#132） |
 | #132 | 领域语义重审·下载域 | 被阻塞（1：#131；全 Demo-out 低位） |
 | #121 | 存储与持久化边界 | 被阻塞（1：#131） |
 | #122 | 任务编排与 watcher 架构 | 被阻塞（1：#130） |
@@ -53,6 +54,7 @@ pg-core（Java Core）重建的架构决策集：所有阻塞实现的决策各�
 
 ## Not yet specified（fog）
 
+- Java 三方文本合并库选型（ADR-0009 语义已随 #129/ADR-0020 维持定稿；JGit Merger、自写移植等候选；待合并实现排期前立票）
 - 诊断/日志/脱敏横切（承接已关 #113 的能力面 + ADR-0011 会话日志/别名路径重估；#120 拆票时留 fog：问题面与 #113 能力面交织，待 #123 接入契约成形后毕业）
 - 打包分发余项（安装包格式、AOT cache 启用与否、版本更新通道——打包方式已定 jpackage 自带运行时，见 #118/ADR-0017）
 - i18n/本地化归属（Core vs 客户端）

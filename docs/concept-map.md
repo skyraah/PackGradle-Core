@@ -35,8 +35,8 @@
 | 忽略（Ignore） | demo | 计划面基础决议语义 |
 | 手动处理（Manual） | demo | 计划面基础决议语义 |
 | 同步范围（Sync Scope） | demo | 映射策略声明的管理边界（原「受管范围」，2026-09-10 更名） |
-| 合并（Merge） | demo 外 | ADR-0009 全套语义保留 |
-| 冲突块（Conflict Hunk） | demo 外 | 随合并域 |
+| 合并（Merge） | demo 外 | ADR-0009 全套维持定稿（ADR-0020；Go 已全量实现） |
+| 冲突块（Conflict Hunk） | demo 外 | 随合并域（ADR-0009/0020） |
 
 ### 3. 执行与恢复（8）
 
